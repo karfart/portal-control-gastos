@@ -1,0 +1,34 @@
+@page "/tipogasto"
+@using PortalControlGastos.Core
+@using System.Net.Http
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h3>Tipos de Gasto</h3>
+
+<input @bind="nuevo.Nombre" placeholder="Nombre del gasto" />
+<button @onclick="Agregar">Agregar</button>
+
+<ul>
+    @foreach (var tipo in tipos)
+    {
+        <li>@tipo.Codigo - @tipo.Nombre</li>
+    }
+</ul>
+
+@code {
+    List<TipoGasto> tipos = new();
+    TipoGasto nuevo = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        tipos = await Http.GetFromJsonAsync<List<TipoGasto>>("tipogasto.json") ?? new();
+    }
+
+    async Task Agregar()
+    {
+        nuevo.Codigo = tipos.Any() ? tipos.Max(t => t.Codigo) + 1 : 1;
+        tipos.Add(new TipoGasto { Codigo = nuevo.Codigo, Nombre = nuevo.Nombre });
+        nuevo = new TipoGasto();
+    }
+}

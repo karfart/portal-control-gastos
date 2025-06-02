@@ -1,0 +1,31 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+<div class="page">
+    <div class="sidebar">
+        @if (!isLogin)
+        {
+            <NavMenu />
+        }
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+        </div>
+
+        <div class="content px-4">
+            @Body
+        </div>
+    </main>
+</div>
+
+@code {
+    private bool isLogin;
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToBaseRelativePath(Navigation.Uri).ToLower();
+        isLogin = uri == "login" || uri == "";
+    }
+}

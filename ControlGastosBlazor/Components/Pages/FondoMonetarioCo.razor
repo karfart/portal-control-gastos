@@ -1,0 +1,102 @@
+﻿@page "/fondomonetario"
+@rendermode InteractiveServer
+@using ControlGastosBlazor.Components.Data
+@using ControlGastosBlazor.Components.Entities
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+
+<h3>Fondo Monetario</h3>
+
+<div class="mb-3">
+    <label>Nombre</label>
+    <input @bind="nuevo.Nombre" class="form-control" />
+
+    <label class="mt-2">Tipo</label>
+    <select @bind="nuevo.Tipo" class="form-control">
+        <option disabled value="">-- Seleccione --</option>
+        <option>Cuenta Bancaria</option>
+        <option>Efectivo</option>
+        <option>Crédito</option>
+    </select>
+
+    <button class="btn btn-primary mt-3" @onclick="Agregar">Agregar</button>
+</div>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert alert-info">@mensaje</div>
+}
+
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>Nombre</th>
+            <th>Tipo</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var fondo in lista)
+        {
+            <tr>
+                <td>@fondo.Id</td>
+                <td>@fondo.Nombre</td>
+                <td>@fondo.Tipo</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" @onclick="() => Eliminar(fondo.Id)">Eliminar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    FondoMonetario nuevo = new();
+    List<FondoMonetario> lista = new();
+    string mensaje = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarLista();
+    }
+
+    async Task CargarLista()
+    {
+        lista = await Db.FondoMonetarios.OrderBy(f => f.Id).ToListAsync();
+    }
+
+    async Task Agregar()
+    {
+        if (string.IsNullOrWhiteSpace(nuevo.Nombre) || string.IsNullOrWhiteSpace(nuevo.Tipo))
+        {
+            mensaje = "Todos los campos son requeridos.";
+            return;
+        }
+
+        try
+        {
+            Db.FondoMonetarios.Add(nuevo);
+            await Db.SaveChangesAsync();
+            mensaje = "Fondo registrado.";
+            nuevo = new();
+            await CargarLista();
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error: {ex.Message}";
+        }
+    }
+
+    async Task Eliminar(int id)
+    {
+        var fondo = await Db.FondoMonetarios.FindAsync(id);
+        if (fondo != null)
+        {
+            Db.FondoMonetarios.Remove(fondo);
+            await Db.SaveChangesAsync();
+            mensaje = "Fondo eliminado.";
+            await CargarLista();
+        }
+    }
+}

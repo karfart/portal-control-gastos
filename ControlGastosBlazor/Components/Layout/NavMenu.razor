@@ -1,0 +1,76 @@
+﻿@inject NavigationManager Navigation
+
+@code {
+    private bool EsLogin => Navigation.Uri.ToLower().Contains("/login");
+}
+
+@if (!EsLogin)
+{
+    <div class="top-row ps-3 navbar navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="">ControlGastosBlazor</a>
+        </div>
+    </div>
+
+    <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+    <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+        <nav class="flex-column">
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="home">
+                    Principal
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="tipogasto">
+                    Tipos de Gasto
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="fondomonetario">
+                    Fondo Monetario
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="presupuesto">
+                    Presupuesto por Gasto
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="registro-gastos">
+                    Registro de Gastos
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="deposito">
+                    Depósitos
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="consultamovimientos">
+                    Consulta Movimientos
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-block py-2" href="graficocomparativo">
+                    Gráfico Comparativo
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3 mt-4">
+                <NavLink class="nav-link d-block py-2 text-danger" href="login">
+                    Cerrar sesión
+                </NavLink>
+            </div>
+
+        </nav>
+    </div>
+}

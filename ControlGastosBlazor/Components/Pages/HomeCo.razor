@@ -1,0 +1,41 @@
+﻿@page "/home"
+@using ControlGastosBlazor.Components.Services
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Microsoft.EntityFrameworkCore.Metadata.Internal
+@inject ProtectedLocalStorage Storage
+@inject UserContext UsuarioContext
+@inject NavigationManager Navigation
+
+<PageTitle>Inicio</PageTitle>
+
+<div class="card shadow-sm p-4">
+    <h1 class="card-title">Bienvenido @UsuarioContext.UsuarioId</h1>
+
+    <p class="card-text lead">¡Has iniciado sesión correctamente!</p>
+
+    <p>Usa el menú lateral para acceder a las funcionalidades del sistema, como:</p>
+    <ul>
+        <li>Matenimientos de tipo de gasto y fondos monetarios</li>
+        <li>Registrar movimientos de presupuesto gastos y depósitos</li>
+        <li>Consulta de reportes y cuadros comparativos</li>        
+    </ul>
+
+    <p>También puedes cerrar sesión desde el menú.</p>
+</div>
+
+@code {
+    private bool cargado = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !cargado)
+        {
+            var result = await Storage.GetAsync<string>("usuario");
+            UsuarioContext.UsuarioId = result.Success ? result.Value ?? string.Empty : string.Empty;
+            cargado = true;
+
+            // Si necesitas refrescar la UI luego del cambio:
+            StateHasChanged();
+        }
+    }
+}

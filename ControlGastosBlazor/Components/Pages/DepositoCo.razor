@@ -1,0 +1,142 @@
+﻿@page "/deposito"
+@rendermode InteractiveServer
+
+@using ControlGastosBlazor.Components.Entities
+@using ControlGastosBlazor.Components.Data
+@using ControlGastosBlazor.Components.Services
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject NavigationManager Navigation
+@inject UserContext UsuarioContext
+
+<h3>Registro de Depósitos</h3>
+
+@if (!string.IsNullOrWhiteSpace(mensaje))
+{
+    <div class="alert alert-info">@mensaje</div>
+}
+
+<div class="mb-3">
+    <label>Fecha</label>
+    <InputDate @bind-Value="nuevo.Fecha" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label>Fondo Monetario</label>
+    <select @bind="nuevo.FondoMonetarioId" class="form-control">
+        <option value="0">-- Seleccione --</option>
+        @foreach (var fondo in fondos)
+        {
+            <option value="@fondo.Id">@fondo.Nombre</option>
+        }
+    </select>
+</div>
+
+<div class="mb-3">
+    <label>Monto</label>
+    <InputNumber @bind-Value="nuevo.Monto" class="form-control" />
+</div>
+
+<button class="btn btn-primary" @onclick="Guardar">Guardar Depósito</button>
+
+<hr />
+<h4>Depósitos Registrados</h4>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Fondo Monetario</th>
+            <th>Monto</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var dep in lista)
+        {
+            <tr>
+                <td>@dep.Fecha.ToShortDateString()</td>
+                <td>@dep.Fondo?.Nombre</td>
+                <td>@dep.Monto.ToString("C")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    Deposito nuevo = new()
+    {
+        Fecha = DateTime.Today
+    };
+
+    List<Deposito> lista = new();
+    List<FondoMonetario> fondos = new();
+    string mensaje = "";
+    bool cargado = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !cargado)
+        {
+
+            var usuarioId = await Db.Usuarios
+            .Where(u => u.Username == UsuarioContext.UsuarioId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+
+            nuevo.UsuarioId = usuarioId;
+            await CargarDatos();
+            cargado = true;
+            StateHasChanged();
+        }
+    }
+
+    async Task CargarDatos()
+    {
+        var usuarioId = await Db.Usuarios
+            .Where(u => u.Username == UsuarioContext.UsuarioId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+        
+        fondos = await Db.FondoMonetarios.OrderBy(f => f.Nombre).ToListAsync();
+        
+        lista = await Db.Depositos
+            .Include(d => d.Fondo)
+            .Where(d => d.UsuarioId == usuarioId)
+            .OrderByDescending(d => d.Fecha)
+            .ToListAsync();
+    }
+
+    async Task Guardar()
+    {
+        if (nuevo.FondoMonetarioId == 0)
+        {
+            mensaje = "Seleccione un fondo monetario.";
+            return;
+        }
+
+        if (nuevo.Monto <= 0)
+        {
+            mensaje = "Ingrese un monto válido.";
+            return;
+        }
+
+        var usuarioId = await Db.Usuarios
+            .Where(u => u.Username == UsuarioContext.UsuarioId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+
+        try
+        {
+            nuevo.UsuarioId = usuarioId;
+            Db.Depositos.Add(nuevo);
+            await Db.SaveChangesAsync();
+            mensaje = "Depósito guardado correctamente.";
+            nuevo = new Deposito { Fecha = DateTime.Today };
+            await CargarDatos();
+        }
+        catch (Exception ex)
+        {
+            mensaje = "Error al guardar: " + ex.Message;
+        }
+    }
+}

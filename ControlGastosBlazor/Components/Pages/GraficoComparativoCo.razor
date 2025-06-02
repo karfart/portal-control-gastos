@@ -1,0 +1,94 @@
+﻿@page "/graficocomparativo"
+@rendermode InteractiveServer
+@inject AppDbContext Db
+@inject UserContext UsuarioContext
+@inject IJSRuntime JS
+@using ControlGastosBlazor.Components.Data
+@using ControlGastosBlazor.Components.Services
+@using Microsoft.EntityFrameworkCore
+
+<h3>Gráfico Comparativo de Presupuestos vs Ejecución</h3>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label>Fecha Inicio:</label>
+        <input type="date" class="form-control" @bind="fechaInicio" />
+    </div>
+    <div class="col-md-4">
+        <label>Fecha Fin:</label>
+        <input type="date" class="form-control" @bind="fechaFin" />
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+        <button class="btn btn-primary w-100" @onclick="CargarGrafico">Generar Gráfico</button>
+    </div>
+</div>
+
+@if (datos != null && datos.Any())
+{
+    <canvas id="graficoComparativo" width="800" height="400"></canvas>
+}
+
+@code {
+    private DateTime fechaInicio = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime fechaFin = DateTime.Today;
+    private List<GraficoDTO> datos = new();
+    private bool debeDibujar = false;
+
+    private async Task CargarGrafico()
+    {
+        var usuarioId = await Db.Usuarios
+            .Where(u => u.Username == UsuarioContext.UsuarioId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+
+        var gastos = await Db.Gastos
+            .Where(g => g.Fecha >= fechaInicio && g.Fecha <= fechaFin && g.UsuarioId == usuarioId)
+            .SelectMany(g => g.Detalles)
+            .GroupBy(d => d.TipoGastoId)
+            .Select(g => new
+            {
+                TipoGastoId = g.Key,
+                Ejecutado = g.Sum(d => d.Monto)
+            })
+            .ToListAsync();
+
+        var presupuestos = await Db.Presupuestos
+            .Where(p => p.Anio >= fechaInicio.Year && p.Anio <= fechaFin.Year && p.UsuarioId == usuarioId)
+            .ToListAsync();
+
+        var tipos = await Db.TipoGastos.ToListAsync();
+
+        datos = tipos.Select(t => new GraficoDTO
+        {
+            tipo = t.Nombre,
+            presupuesto = presupuestos
+                .Where(p => p.TipoGastoId == t.Id && new DateTime(p.Anio, p.Mes, 1) >= fechaInicio && new DateTime(p.Anio, p.Mes, 1) <= fechaFin)
+                .Sum(p => p.Monto),
+            ejecutado = gastos.FirstOrDefault(g => g.TipoGastoId == t.Id)?.Ejecutado ?? 0
+        }).ToList();
+
+        debeDibujar = datos.Any();
+
+        StateHasChanged(); // Fuerza renderizado del canvas
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (debeDibujar)
+        {
+            debeDibujar = false;
+
+            await JS.InvokeVoidAsync("import", "https://cdn.jsdelivr.net/npm/chart.js");
+            await JS.InvokeVoidAsync("import", "/graficos.js");
+
+            await JS.InvokeVoidAsync("dibujarGrafico", datos);
+        }
+    }
+
+    public class GraficoDTO
+    {
+        public string tipo { get; set; } = string.Empty;
+        public decimal presupuesto { get; set; }
+        public decimal ejecutado { get; set; }
+    }
+}

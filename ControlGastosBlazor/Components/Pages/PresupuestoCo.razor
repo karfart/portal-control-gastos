@@ -1,0 +1,173 @@
+﻿@page "/presupuesto"
+@rendermode InteractiveServer
+@using ControlGastosBlazor.Components.Services
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Microsoft.EntityFrameworkCore
+@using ControlGastosBlazor.Components.Data
+@using ControlGastosBlazor.Components.Entities
+@using System.Globalization
+@inject AppDbContext Db
+@inject ProtectedLocalStorage Storage
+@inject UserContext UsuarioContext
+
+<h3>Presupuesto por Tipo de Gasto</h3>
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label>Mes</label>
+        <select @bind="mes" class="form-control">
+            @for (int m = 1; m <= 12; m++)
+            {
+                <option value="@m">@CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label>Año</label>
+        <input type="number" @bind="anio" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label>Tipo de Gasto</label>
+        <select @bind="tipoGastoId" class="form-control">
+            <option value="">-- Seleccione --</option>
+            @foreach (var tipo in tipos)
+            {
+                <option value="@tipo.Codigo">@tipo.Nombre</option>
+            }
+        </select>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label>Monto Presupuestado</label>
+    <input type="number" step="0.01" @bind="monto" class="form-control" />
+</div>
+
+<button class="btn btn-primary" @onclick="Guardar">Guardar Presupuesto</button>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert alert-info mt-3">@mensaje</div>
+}
+
+@if (presupuestos.Any())
+{
+    <h5 class="mt-4">Presupuestos Registrados</h5>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Año</th>
+                <th>Mes</th>
+                <th>Tipo de Gasto</th>
+                <th>Monto</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in presupuestos)
+            {
+                <tr>
+                    <td>@p.Anio</td>
+                    <td>@CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(p.Mes)</td>
+                    <td>@p.TipoGasto?.Nombre</td>
+                    <td>@p.Monto.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    List<TipoGasto> tipos = new();
+    List<Presupuesto> presupuestos = new();
+    string tipoGastoId = "";
+    int mes = DateTime.Now.Month;
+    int anio = DateTime.Now.Year;
+    decimal monto;
+    string mensaje = "";
+    private bool cargado = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tipos = await Db.TipoGastos.OrderBy(t => t.Nombre).ToListAsync();
+        await CargarPresupuestos();
+        
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !cargado)
+        {
+            var result = await Storage.GetAsync<string>("usuario");
+            UsuarioContext.UsuarioId = result.Success ? result.Value ?? string.Empty : string.Empty;
+            cargado = true;            
+        }
+   
+    }
+
+    async Task CargarPresupuestos()
+    {
+          var usuarioId = await Db.Usuarios
+            .Where(u => u.Username == UsuarioContext.UsuarioId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+        
+        presupuestos = await Db.Presupuestos
+            .Include(p => p.TipoGasto)
+            .Where(p => p.UsuarioId == usuarioId)
+            .OrderByDescending(p => p.Anio)
+            .ThenByDescending(p => p.Mes)
+            .ToListAsync();
+    }
+
+    async Task Guardar()
+    {
+        if (string.IsNullOrEmpty(tipoGastoId) || monto <= 0)
+        {
+            mensaje = "Debe completar todos los campos.";
+            return;
+        }
+
+        try
+        {
+            var usuarioId = await Db.Usuarios
+            .Where(u => u.Username == UsuarioContext.UsuarioId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+        
+            var existe = await Db.Presupuestos
+                .AnyAsync(p => p.UsuarioId == usuarioId && p.Mes == mes && p.Anio == anio && p.TipoGastoId.ToString() == tipoGastoId);
+
+            if (existe)
+            {
+                mensaje = "Ya existe un presupuesto para ese mes y tipo de gasto.";
+                return;
+            }
+
+          
+
+            var presupuesto = new Presupuesto
+            {
+                UsuarioId = usuarioId,
+                TipoGastoId = int.Parse(tipoGastoId),
+                Mes = mes,
+                Anio = anio,
+                Monto = monto
+            };
+
+            Db.Presupuestos.Add(presupuesto);
+            await Db.SaveChangesAsync();
+
+            mensaje = "Presupuesto guardado correctamente.";
+            tipoGastoId = "";
+            monto = 0;
+
+            await CargarPresupuestos();
+        }
+        catch (Exception ex)
+        {
+            mensaje = $"Error: {ex.Message}";
+        }
+    }
+}
+
+

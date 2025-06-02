@@ -1,0 +1,109 @@
+﻿@page "/consultamovimientos"
+@rendermode InteractiveServer
+@using ControlGastosBlazor.Components.Data
+@using ControlGastosBlazor.Components.Entities
+@using ControlGastosBlazor.Components.Services
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+@inject UserContext UsuarioContext
+
+<h3>Consulta de Movimientos</h3>
+
+<div class="mb-3 row">
+    <div class="col-md-3">
+        <label class="form-label">Fecha Inicial</label>
+        <InputDate @bind-Value="fechaInicio" class="form-control" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Fecha Final</label>
+        <InputDate @bind-Value="fechaFin" class="form-control" />
+    </div>
+    <div class="col-md-3 align-self-end">
+        <button class="btn btn-primary" @onclick="Consultar">Consultar</button>
+    </div>
+</div>
+
+@if (movimientos.Count == 0)
+{
+    <p>No hay movimientos en el rango de fechas seleccionado.</p>
+}
+else
+{
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Fondo</th>
+                <th>Descripción</th>
+                <th>Monto</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in movimientos.OrderBy(m => m.Fecha))
+            {
+                <tr>
+                    <td>@item.Fecha.ToString("dd/MM/yyyy")</td>
+                    <td>@item.Tipo</td>
+                    <td>@item.Fondo</td>
+                    <td>@item.Descripcion</td>
+                    <td>@item.Monto.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private DateTime fechaInicio = new(2025, 06, 01);
+    private DateTime fechaFin = new(2025, 06, 02);
+
+    private List<MovimientoDTO> movimientos = new();
+
+    private async Task Consultar()
+    {
+        movimientos.Clear();
+
+        var usuarioId = await Db.Usuarios
+            .Where(u => u.Username == UsuarioContext.UsuarioId)
+            .Select(u => u.Id)
+            .FirstOrDefaultAsync();
+
+
+        var gastos = await Db.Gastos
+            .Include(g => g.Fondo)
+            .Where(g => g.Fecha >= fechaInicio && g.Fecha <= fechaFin && g.UsuarioId == usuarioId)
+            .SelectMany(g => g.Detalles.Select(d => new MovimientoDTO
+            {
+                Fecha = g.Fecha,
+                Tipo = "Gasto",
+                Fondo = g.Fondo!.Nombre,
+                Descripcion = d.TipoGasto!.Nombre,
+                Monto = d.Monto
+            }))
+            .ToListAsync();
+
+        var depositos = await Db.Depositos
+            .Where(d => d.Fecha >= fechaInicio && d.Fecha <= fechaFin && d.UsuarioId == usuarioId)
+            .Select(d => new MovimientoDTO
+            {
+                Fecha = d.Fecha,
+                Tipo = "Depósito",
+                Fondo = d.Fondo!.Nombre,
+                Descripcion = "Depósito",
+                Monto = d.Monto
+            })
+            .ToListAsync();
+
+        movimientos = gastos.Concat(depositos).ToList();
+    }
+
+    private class MovimientoDTO
+    {
+        public DateTime Fecha { get; set; }
+        public string Tipo { get; set; } = "";
+        public string Fondo { get; set; } = "";
+        public string Descripcion { get; set; } = "";
+        public decimal Monto { get; set; }
+    }
+}

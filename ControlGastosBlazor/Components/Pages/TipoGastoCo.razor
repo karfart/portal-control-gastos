@@ -1,0 +1,99 @@
+﻿@page "/tipogasto"
+@rendermode InteractiveServer
+@using ControlGastosBlazor.Components.Data
+@using ControlGastosBlazor.Components.Entities
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext Db
+
+<h3>Tipos de Gasto</h3>
+
+<div class="mb-3">
+    <label>Nombre del Gasto</label>
+    <input @bind="nuevo.Nombre" class="form-control" />
+    <button class="btn btn-primary mt-2" @onclick="Agregar">Agregar</button>
+</div>
+
+@if (!string.IsNullOrEmpty(mensaje))
+{
+    <div class="alert alert-info">@mensaje</div>
+}
+
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var tipo in lista)
+        {
+            <tr>
+                <td>@tipo.Codigo</td>
+                <td>@tipo.Nombre</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" @onclick="() => Eliminar(tipo.Codigo)">Eliminar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    List<TipoGasto> lista = new();
+    TipoGasto nuevo = new();
+    string mensaje = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarLista();
+    }
+
+    async Task CargarLista()
+    {
+        lista = await Db.TipoGastos.OrderBy(t => t.Codigo).ToListAsync();
+    }
+
+    async Task Agregar()
+{
+    if (string.IsNullOrWhiteSpace(nuevo.Nombre))
+    {
+        mensaje = "El nombre es requerido.";
+        return;
+    }
+
+    try
+    {
+        var maxCodigo = await Db.TipoGastos.AnyAsync()
+            ? await Db.TipoGastos.MaxAsync(t => t.Codigo)
+            : 0;
+
+        nuevo.Codigo = maxCodigo + 1;
+
+        Db.TipoGastos.Add(nuevo);
+        await Db.SaveChangesAsync();
+
+        mensaje = "Tipo de gasto agregado.";
+        nuevo = new();
+        await CargarLista();
+    }
+    catch (Exception ex)
+    {
+        mensaje = $"Error al guardar: {ex.Message}";
+    }
+}
+
+
+    async Task Eliminar(int codigo)
+    {
+        var tipo = await Db.TipoGastos.FindAsync(codigo);
+        if (tipo != null)
+        {
+            Db.TipoGastos.Remove(tipo);
+            await Db.SaveChangesAsync();
+            mensaje = "Tipo de gasto eliminado.";
+            await CargarLista();
+        }
+    }
+}
